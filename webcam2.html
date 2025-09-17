@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            min-height: 100vh;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            max-height: 80vh;
+            object-fit: contain;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center container mx-auto p-4">
+
+    <div class="flex flex-col items-center justify-center p-4 sm:p-8 bg-gray-800 rounded-xl shadow-lg w-full max-w-5xl">
+        
+        <video id="camera-feed" playsinline autoplay class="rounded-xl border-4 border-gray-700 mb-6 shadow-xl"></video>
+
+        <p id="status" class="text-center text-red-400 mb-4 font-semibold h-6"></p>
+
+        <div class="flex flex-wrap items-center justify-center gap-4 w-full">
+            <div class="flex items-center gap-2">
+                <label for="resolution" class="text-sm font-medium text-gray-300">Resolution:</label>
+                <select id="resolution" name="resolution" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5">
+                    <option value="640x480">480p</option>
+                    <option value="1280x720" selected>720p</option>
+                    <option value="1920x1080">1080p</option>
+                    <option value="3840x2160">4K</option>
+                </select>
+            </div>
+            
+            <button id="start-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-full transition-colors duration-300 shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50">
+                Start
+            </button>
+            <button id="stop-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-5 rounded-full transition-colors duration-300 shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 hidden">
+                Stop
+            </button>
+            <button id="fullscreen-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-full transition-colors duration-300 shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 hidden">
+                Full Screen
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoElement = document.getElementById('camera-feed');
+            const startButton = document.getElementById('start-btn');
+            const stopButton = document.getElementById('stop-btn');
+            const fullscreenButton = document.getElementById('fullscreen-btn');
+            const statusMessage = document.getElementById('status');
+            const resolutionSelect = document.getElementById('resolution');
+            let currentStream;
+
+            const hasGetUserMedia = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+            const displayStatus = (message, isError = false) => {
+                statusMessage.textContent = message;
+                statusMessage.className = isError 
+                    ? 'text-center text-red-400 mb-4 font-semibold h-6' 
+                    : 'text-center text-green-400 mb-4 font-semibold h-6';
+            };
+
+            const startCamera = async (width, height) => {
+                if (!hasGetUserMedia()) {
+                    displayStatus('Your browser does not support this feature.', true);
+                    return;
+                }
+
+                if (currentStream) {
+                    stopCamera(false);
+                }
+
+                displayStatus(`Requesting ${height}p camera feed...`);
+                
+                const constraints = {
+                    video: {
+                        width: { ideal: width },
+                        height: { ideal: height }
+                    },
+                    audio: false
+                };
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    videoElement.srcObject = stream;
+                    currentStream = stream;
+
+                    videoElement.onloadedmetadata = () => {
+                        videoElement.play();
+                        const track = stream.getVideoTracks()[0];
+                        const settings = track.getSettings();
+                        displayStatus(`Live feed: ${settings.width}x${settings.height}`, false);
+                    };
+
+                    startButton.classList.add('hidden');
+                    stopButton.classList.remove('hidden');
+                    fullscreenButton.classList.remove('hidden');
+
+                } catch (err) {
+                    let errorMessage = `An error occurred: ${err.name}`;
+                    if (err.name === 'NotAllowedError') {
+                        errorMessage = 'Access to the camera was denied.';
+                    } else if (err.name === 'NotFoundError') {
+                        errorMessage = 'No camera found.';
+                    } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+                        // This is the key change: Handle the overconstrained error by trying a lower resolution.
+                        displayStatus(`Could not get ${height}p. Trying lower resolution...`);
+                        
+                        // Fallback logic
+                        if (height === 2160) {
+                            startCamera(1920, 1080); // Fallback from 4K to 1080p
+                        } else if (height === 1080) {
+                            startCamera(1280, 720); // Fallback from 1080p to 720p
+                        } else if (height === 720) {
+                            startCamera(640, 480); // Fallback from 720p to 480p
+                        } else {
+                            displayStatus(`Could not get any resolution.`, true);
+                        }
+                        return; // Exit the function to prevent further execution
+                    } else if (err.name === 'NotReadableError') {
+                        errorMessage = 'Camera is already in use by another app.';
+                    }
+                    displayStatus(errorMessage, true);
+                    console.error('Error accessing camera:', err);
+                    
+                    stopButton.classList.add('hidden');
+                    fullscreenButton.classList.add('hidden');
+                    startButton.classList.remove('hidden');
+                }
+            };
+
+            const stopCamera = (updateUI = true) => {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    videoElement.srcObject = null;
+                    currentStream = null;
+                    if(updateUI) displayStatus('Camera stopped.', false);
+                }
+                if (updateUI) {
+                    startButton.classList.remove('hidden');
+                    stopButton.classList.add('hidden');
+                    fullscreenButton.classList.add('hidden');
+                }
+            };
+            
+            const goFullScreen = () => {
+                if (videoElement.requestFullscreen) {
+                    videoElement.requestFullscreen();
+                } else if (videoElement.webkitRequestFullscreen) { /* Safari */
+                    videoElement.webkitRequestFullscreen();
+                } else if (videoElement.msRequestFullscreen) { /* IE11 */
+                    videoElement.msRequestFullscreen();
+                }
+            };
+
+            // Event Listeners
+            startButton.addEventListener('click', () => {
+                const selectedResolution = resolutionSelect.value.split('x');
+                const width = parseInt(selectedResolution[0], 10);
+                const height = parseInt(selectedResolution[1], 10);
+                startCamera(width, height);
+            });
+            stopButton.addEventListener('click', () => stopCamera(true));
+            fullscreenButton.addEventListener('click', goFullScreen);
+            resolutionSelect.addEventListener('change', () => {
+                if (currentStream) {
+                    const selectedResolution = resolutionSelect.value.split('x');
+                    const width = parseInt(selectedResolution[0], 10);
+                    const height = parseInt(selectedResolution[1], 10);
+                    startCamera(width, height);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
