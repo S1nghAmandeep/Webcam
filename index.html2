@@ -1,3 +1,191 @@
+<!-- <!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Full-Screen & Qualità</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #sidebar {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 250px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            transform: translateX(100%);
+            transition: transform .3s ease;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
+        }
+
+        #btnSidebar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: #444;
+            border: none;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        #btnFullScreen {
+            position: absolute;
+            top: 20px;
+            left: 100px;
+            z-index: 10;
+            background: #444;
+            border: none;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        label,
+        select {
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="videoContainer">
+        <video id="webcamVideo" autoplay playsinline></video>
+        <button id="btnSidebar">☰ Impostazioni</button>
+        <button id="btnFullScreen">🔲 Fullscreen</button>
+    </div>
+
+    <div id="sidebar">
+        <h2>Qualità video</h2>
+        <label for="qualitySelect">Seleziona risoluzione:</label>
+        <select id="qualitySelect">
+            <option value="hd">HD (1280×720)</option>
+            <option value="fullhd">Full HD (1920×1080)</option>
+            <option value="4k">4K (3840×2160)</option>
+        </select>
+        <p id="statusText"></p>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcamVideo');
+        const btnSidebar = document.getElementById('btnSidebar');
+        const sidebar = document.getElementById('sidebar');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const statusText = document.getElementById('statusText');
+        let currentStream = null;
+
+        btnSidebar.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+
+        document.getElementById('btnFullScreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                video.requestFullscreen().catch(err => {
+                    console.warn('Errore full-screen:', err);
+                });
+            } else {
+                document.exitFullscreen().catch(err => {
+                    console.warn('Errore uscita full-screen:', err);
+                });
+            }
+        });
+
+        async function startWebcam(resolution) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            let constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+            if (resolution === 'fullhd') {
+                constraints = { video: { width: { ideal: 1920 }, height: { ideal: 1080 } } };
+            }
+            else if (resolution === '4k') {
+                constraints = { video: { width: { ideal: 3840 }, height: { ideal: 2160 } } };
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                video.srcObject = stream;
+                statusText.textContent = `Stream attivo: ${resolution}`;
+            } catch (err) {
+                console.error('Errore accesso webcam:', err);
+                statusText.textContent = `Errore accesso webcam: ${err.message}`;
+            }
+        }
+
+        // cambio qualità
+        qualitySelect.addEventListener('change', () => {
+            startWebcam(qualitySelect.value);
+        });
+
+        // rilevazione disconnessione / errori
+        function monitorStream(stream) {
+            stream.getVideoTracks().forEach(track => {
+                track.addEventListener('ended', () => {
+                    console.warn('Track ended — riavvio in corso');
+                    statusText.textContent = 'Webcam staccata, riavvio...';
+                    setTimeout(() => {
+                        startWebcam(qualitySelect.value);
+                    }, 1000);
+                });
+                track.addEventListener('mute', () => {
+                    console.warn('Track muted — possibile sospensione');
+                });
+            });
+        }
+
+        // wrapper start + monitor
+        async function init() {
+            await startWebcam(qualitySelect.value);
+            if (currentStream) monitorStream(currentStream);
+            // ogni volta che cambiamo stream, reiniziamo il monitor
+            const originalStart = startWebcam;
+            startWebcam = async function (resolution) {
+                await originalStart(resolution);
+                if (currentStream) monitorStream(currentStream);
+            };
+        }
+
+        init();
+    </script>
+
+</body>
+
+</html> -->
+
 <!DOCTYPE html>
 <html lang="it">
 
@@ -32,11 +220,6 @@
             height: 100%;
             object-fit: cover;
             background: #000;
-            transition: transform .3s ease;
-        }
-
-        video.mirrored {
-            transform: scaleX(-1);
         }
 
         #sidebar {
@@ -121,14 +304,13 @@
 <body>
 
     <div id="videoContainer">
-        <video class="mirrored" id="webcamVideo" autoplay playsinline></video>
+        <video id="webcamVideo" autoplay playsinline></video>
         <button id="btnSidebar">☰ Impostazioni</button>
         <button id="btnFullScreen">🔲 Fullscreen</button>
     </div>
 
     <div id="sidebar">
         <h2>Impostazioni Webcam</h2>
-
         <label for="cameraSelect">Sorgente video:</label>
         <select id="cameraSelect"></select>
 
@@ -145,12 +327,6 @@
             <option value="60">60 fps</option>
         </select>
 
-        <label for="mirrorToggle">Specchia video:</label>
-        <select id="mirrorToggle">
-            <option value="yes" selected>Sì</option>
-            <option value="no">No</option>
-        </select>
-
         <div id="statusIndicator">
             <div id="statusLight"></div>
             <div id="statusText">Inizializzazione...</div>
@@ -165,7 +341,6 @@
         const cameraSelect = document.getElementById('cameraSelect');
         const qualitySelect = document.getElementById('qualitySelect');
         const fpsSelect = document.getElementById('fpsSelect');
-        const mirrorToggle = document.getElementById('mirrorToggle');
         const statusLight = document.getElementById('statusLight');
         const statusText = document.getElementById('statusText');
 
@@ -205,8 +380,6 @@
                 currentStream = stream;
                 video.srcObject = stream;
 
-                applyMirrorSetting();
-
                 statusLight.style.background = 'limegreen';
                 statusText.textContent = `Attivo (${resolution}, ${fps} fps)`;
 
@@ -236,6 +409,7 @@
                     setTimeout(startWebcam, 1000);
                 };
                 track.onmute = () => {
+                    console.warn('Track muto (sospensione)');
                     statusLight.style.background = 'yellow';
                     statusText.textContent = 'Segnale sospeso...';
                 };
@@ -246,16 +420,6 @@
             });
         }
 
-        // --- Specchia video ---
-        function applyMirrorSetting() {
-            if (mirrorToggle.value === 'yes') {
-                video.classList.add('mirrored');
-            } else {
-                video.classList.remove('mirrored');
-            }
-        }
-        mirrorToggle.addEventListener('change', applyMirrorSetting);
-
         // --- Eventi ---
         cameraSelect.addEventListener('change', startWebcam);
         qualitySelect.addEventListener('change', startWebcam);
@@ -263,7 +427,7 @@
 
         // --- Inizializzazione ---
         async function init() {
-            await navigator.mediaDevices.getUserMedia({ video: true });
+            await navigator.mediaDevices.getUserMedia({ video: true }); // per ottenere i nomi delle webcam
             await loadCameras();
             await startWebcam();
             navigator.mediaDevices.ondevicechange = async () => {
