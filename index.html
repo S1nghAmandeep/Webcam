@@ -151,6 +151,15 @@
             <option value="no">No</option>
         </select>
 
+        <!-- 🔄 Nuova opzione per rotazione -->
+        <label for="rotationSelect">Rotazione video:</label>
+        <select id="rotationSelect">
+            <option value="0" selected>0° (normale)</option>
+            <option value="90">90°</option>
+            <option value="180">180°</option>
+            <option value="270">270°</option>
+        </select>
+
         <div id="statusIndicator">
             <div id="statusLight"></div>
             <div id="statusText">Inizializzazione...</div>
@@ -166,6 +175,7 @@
         const qualitySelect = document.getElementById('qualitySelect');
         const fpsSelect = document.getElementById('fpsSelect');
         const mirrorToggle = document.getElementById('mirrorToggle');
+        const rotationSelect = document.getElementById('rotationSelect');
         const statusLight = document.getElementById('statusLight');
         const statusText = document.getElementById('statusText');
 
@@ -187,7 +197,7 @@
             ).join('');
         }
 
-        // --- Imposta e avvia lo stream ---
+        // --- Avvia la webcam ---
         async function startWebcam() {
             try {
                 if (currentStream) currentStream.getTracks().forEach(t => t.stop());
@@ -205,7 +215,7 @@
                 currentStream = stream;
                 video.srcObject = stream;
 
-                applyMirrorSetting();
+                applyVideoTransformations();
 
                 statusLight.style.background = 'limegreen';
                 statusText.textContent = `Attivo (${resolution}, ${fps} fps)`;
@@ -215,7 +225,7 @@
                 console.error('Errore webcam:', err);
                 statusLight.style.background = 'red';
                 statusText.textContent = 'Errore: ' + err.message;
-                // fallback più bassa
+                // fallback
                 if (qualitySelect.value === '4k') {
                     qualitySelect.value = 'fullhd';
                     startWebcam();
@@ -226,7 +236,7 @@
             }
         }
 
-        // --- Monitor disconnessione e riavvio automatico ---
+        // --- Monitor stream ---
         function monitorStream(stream) {
             stream.getVideoTracks().forEach(track => {
                 track.onended = () => {
@@ -246,15 +256,19 @@
             });
         }
 
-        // --- Specchia video ---
-        function applyMirrorSetting() {
-            if (mirrorToggle.value === 'yes') {
-                video.classList.add('mirrored');
-            } else {
-                video.classList.remove('mirrored');
-            }
+        // --- Applica specchio e rotazione ---
+        function applyVideoTransformations() {
+            let rotation = rotationSelect.value;
+            let transform = '';
+
+            if (mirrorToggle.value === 'yes') transform += 'scaleX(-1) ';
+            transform += `rotate(${rotation}deg)`;
+
+            video.style.transform = transform.trim();
         }
-        mirrorToggle.addEventListener('change', applyMirrorSetting);
+
+        mirrorToggle.addEventListener('change', applyVideoTransformations);
+        rotationSelect.addEventListener('change', applyVideoTransformations);
 
         // --- Eventi ---
         cameraSelect.addEventListener('change', startWebcam);
